@@ -29,9 +29,10 @@ public:
         if (found != serviceUUIDList.end())
         {
             BLEDevice::getScan()->stop(); // Останавливаем сканирование
-            Serial.println("Found device with matching service UUID.");
-            bleClient->setFoundDevice(new BLEAdvertisedDevice((advertisedDevice)));
-            // Действия после нахождения устройства...
+            // Не останавливаем сканирование, чтобы продолжить обнаружение других устройств
+            int rssi = advertisedDevice.getRSSI();
+            std::string rssi_str = std::to_string(rssi); // Конвертируем RSSI в строку
+            Serial.println(("Found device with matching service UUID. RSSI: " + rssi_str).c_str());
         }
     }
     BLEClientWrapper *bleClient;
