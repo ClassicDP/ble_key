@@ -107,7 +107,7 @@ bool BLEClientWrapper::connectToServer()
         return false;
     }
 
-    Serial.println("Subsribing to services...");
+    Serial.println("Subscribing to services...");
 
     // Перебираем все описания сервисов и подключаемся к характеристикам
     for (const auto &serviceDesc : serviceDescriptors_)
@@ -141,7 +141,7 @@ bool BLEClientWrapper::connectToServer()
             BLEUUID tempUuid = serviceDesc.serviceUUID;
             Serial.println("Service not found: " + String(tempUuid.toString().c_str()));
         }
-        Serial.println("Reconnetion compleete");
+        Serial.println("Reconnection complete");
     }
 
     lastDeviceAddress_ = foundDevice_->getAddress().toString(); // Сохраняем адрес устройства для возможного переподключения
