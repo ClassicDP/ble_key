@@ -28,19 +28,19 @@ public:
     bool isConnected() const;
     void taskManager();
     BLEClientWrapper(const std::vector<BLEServiceDescriptor> &descriptors);
-    void setFoundDevice(BLEAdvertisedDevice *foundDevice);
+    void setDevice(BLEAdvertisedDevice *foundDevice);
     std::vector<BLEUUID> getServiceUUIDList();
 
 private:
 private:
-    BLEScan *bleScan_;
-    BLEClient *client_;
+    BLEScan *bleScan_ = nullptr;
+    BLEClient *pClient_ = nullptr;
     std::vector<BLEServiceDescriptor> serviceDescriptors_;
     std::string lastDeviceAddress_;
-    BLERemoteService *remoteService_;
-    BLERemoteCharacteristic *characteristic1_;
-    BLERemoteCharacteristic *characteristic2_;
+    BLERemoteService *remoteService_ = nullptr;
+    BLERemoteCharacteristic *characteristic1_ = nullptr;
+    BLERemoteCharacteristic *characteristic2_ = nullptr;
     static void notifyCallback(BLERemoteCharacteristic *characteristic, uint8_t *data, size_t length, bool isNotify);
     bool shouldReconnect_ = false;
-    BLEAdvertisedDevice *foundDevice_;
+    BLEAdvertisedDevice *pDevice_ = nullptr;
 };

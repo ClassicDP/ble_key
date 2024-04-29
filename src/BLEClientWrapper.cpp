@@ -1,9 +1,14 @@
 #include "BLEClientWrapper.h"
 #include <Arduino.h>
+#include <type_traits>
 
 template <typename T>
-void freePtr(T *& ptr) {
-    if (ptr) {
+void freePtr(T *&ptr)
+{
+    Serial.print("deleting: ");
+    Serial.println(typeid(T).name());
+    if (ptr!= nullptr)
+    {
         delete ptr;
         ptr = nullptr;
     }
@@ -33,6 +38,8 @@ public:
             int rssi = advertisedDevice.getRSSI();
             std::string rssi_str = std::to_string(rssi); // Конвертируем RSSI в строку
             Serial.println(("Found device with matching service UUID. RSSI: " + rssi_str).c_str());
+            bleClient->setDevice(new BLEAdvertisedDevice((advertisedDevice)));
+            // Действия после нахождения устройства...
         }
     }
     BLEClientWrapper *bleClient;
@@ -41,8 +48,8 @@ public:
 BLEClientWrapper::BLEClientWrapper(const std::vector<BLEServiceDescriptor> &descriptors)
     : serviceDescriptors_(descriptors)
 {
-    client_ = nullptr;
-    foundDevice_ = nullptr;
+    pClient_ = nullptr;
+    pDevice_ = nullptr;
     BLEDevice::init("");
     Serial.println("Starting Arduino BLE Client application...");
     bleScan_ = BLEDevice::getScan();
@@ -58,21 +65,20 @@ BLEScanResults BLEClientWrapper::startScan()
     BLEScanResults results;
     do
     {
-        results = bleScan_->start(500, false); // Сканирование на 1 секунду
+        results = bleScan_->start(1, false); // Сканирование
         if (results.getCount() == 0)
         {
             Serial.println("No devices found. Restarting scan...");
         }
-    } while (results.getCount() == 0);
-    connectToServer();
+    } while (results.getCount() == 0 || !connectToServer());
+    
 
     return results;
 }
 
-void BLEClientWrapper::setFoundDevice(BLEAdvertisedDevice *foundDevice)
+void BLEClientWrapper::setDevice(BLEAdvertisedDevice *device)
 {
-    freePtr(foundDevice_);
-    foundDevice_ = foundDevice;
+    pDevice_ = device;
 }
 
 std::vector<BLEUUID> BLEClientWrapper::getServiceUUIDList()
@@ -93,28 +99,32 @@ BLEClientWrapper::~BLEClientWrapper()
 bool BLEClientWrapper::connectToServer()
 {
     Serial.println("Connecting to server...");
-    disconnectFromServer();              // Отключаемся от предыдущего сервера, если это необходимо
-    free(client_);
-    client_ = BLEDevice::createClient(); // Создаем новый клиент BLE
-    while (!foundDevice_)
+    disconnectFromServer(); // Отключаемся от предыдущего сервера, если это необходимо
+    free(pClient_);
+    pClient_ = BLEDevice::createClient(); // Создаем новый клиент BLE
+
+    while (!pDevice_)
     {
-        /* code */
+        Serial.println("Waiting for device");
+        return false;
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
     Serial.println("Connected");
 
-    if (!client_->connect(foundDevice_)) // Попытка подключения к устройству
+    if (!pClient_->connect(pDevice_)) // Попытка подключения к устройству
     {
         Serial.println("Failed to connect to server.");
         return false;
     }
 
     Serial.println("Subscribing to services...");
+    Serial.println(std::to_string(pClient_->getRssi()).c_str());
 
     // Перебираем все описания сервисов и подключаемся к характеристикам
     for (const auto &serviceDesc : serviceDescriptors_)
     {
-        auto remoteService = client_->getService(serviceDesc.serviceUUID); // Получаем сервис по UUID
-        if (remoteService)                                                 // Проверяем, что сервис доступен
+        auto remoteService = pClient_->getService(serviceDesc.serviceUUID); // Получаем сервис по UUID
+        if (remoteService)                                                  // Проверяем, что сервис доступен
         {
             for (const auto &charDesc : serviceDesc.characteristics)
             {
@@ -145,23 +155,25 @@ bool BLEClientWrapper::connectToServer()
         Serial.println("Reconnection complete");
     }
 
-    lastDeviceAddress_ = foundDevice_->getAddress().toString(); // Сохраняем адрес устройства для возможного переподключения
+    lastDeviceAddress_ = pDevice_->getAddress().toString(); // Сохраняем адрес устройства для возможного переподключения
+
     return true;
 }
 
 void BLEClientWrapper::disconnectFromServer()
 {
-    if (client_)
+    if (pClient_)
     {
-        client_->disconnect();
-        delete client_;
-        client_ = nullptr;
+        pClient_->disconnect();
+        delete pClient_;
+        pClient_ = nullptr;
     }
 }
 
 void BLEClientWrapper::tryReconnect()
 {
-    connectToServer();
+    free(pDevice_);
+    startScan();
     // if (!lastDeviceAddress_.empty() && client_)
     // {
     //     BLEAddress addr(lastDeviceAddress_);
@@ -179,7 +191,7 @@ void BLEClientWrapper::tryReconnect()
 
 bool BLEClientWrapper::isConnected() const
 {
-    return client_ && client_->isConnected();
+    return pClient_ && pClient_->isConnected();
 }
 
 void BLEClientWrapper::taskManager()
@@ -190,6 +202,7 @@ void BLEClientWrapper::taskManager()
         {
             tryReconnect();
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS); // Задержка на 1 секунду
+        Serial.println(std::to_string(pClient_->getRssi()).c_str());
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
