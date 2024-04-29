@@ -11,7 +11,6 @@ BLEClientWrapper* bleClientWrapper;
 
 void setup() {
     Serial.begin(115200);
-    delay(2000);
     std::vector<BLEServiceDescriptor> serviceDescriptors = {
         {BLEUUID(LOCK_SERVICE_UUID), {
             {BLEUUID(LOCK_STATUS_UUID), [](BLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify) {
@@ -39,7 +38,8 @@ void setup() {
     };
 
     bleClientWrapper = new BLEClientWrapper(serviceDescriptors);
-    bleClientWrapper->findDevice();
+    bleClientWrapper->startScan();
+    bleClientWrapper->taskManager();
 
     // Запускаем сканирование BLE-устройств
  

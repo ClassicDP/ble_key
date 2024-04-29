@@ -28,7 +28,6 @@ public:
     bool isConnected() const;
     void taskManager();
     BLEClientWrapper(const std::vector<BLEServiceDescriptor> &descriptors);
-    void findDevice();
     void setFoundDevice(BLEAdvertisedDevice *foundDevice);
     std::vector<BLEUUID> getServiceUUIDList();
 

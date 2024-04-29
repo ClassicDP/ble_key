@@ -1,6 +1,13 @@
 #include "BLEClientWrapper.h"
 #include <Arduino.h>
 
+template <typename T>
+void freePtr(T *& ptr) {
+    if (ptr) {
+        delete ptr;
+        ptr = nullptr;
+    }
+}
 // Коллбек для обработки найденных устройств
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
 {
@@ -45,30 +52,26 @@ BLEClientWrapper::BLEClientWrapper(const std::vector<BLEServiceDescriptor> &desc
     bleScan_->start(1, true);
 }
 
-void BLEClientWrapper::findDevice()
+BLEScanResults BLEClientWrapper::startScan()
 {
-    // Инициируем сканирование
-    startScan();
-
-    // Ждем завершения сканирования
-    // Для примера используем delay, хотя в реальном приложении стоит использовать другие механизмы
-    delay(1000); 
-
-    // Проверяем, найдено ли устройство
-    if (foundDevice_)
+    BLEScanResults results;
+    do
     {
-        Serial.println("Device found. Connecting...");
-        connectToServer();
-    }
-    else
-    {
-        Serial.println("No device found.");
-    }
+        results = bleScan_->start(500, false); // Сканирование на 1 секунду
+        if (results.getCount() == 0)
+        {
+            Serial.println("No devices found. Restarting scan...");
+        }
+    } while (results.getCount() == 0);
+    connectToServer();
+
+    return results;
 }
 
 void BLEClientWrapper::setFoundDevice(BLEAdvertisedDevice *foundDevice)
 {
-    this->foundDevice_ = foundDevice;
+    freePtr(foundDevice_);
+    foundDevice_ = foundDevice;
 }
 
 std::vector<BLEUUID> BLEClientWrapper::getServiceUUIDList()
@@ -86,21 +89,25 @@ BLEClientWrapper::~BLEClientWrapper()
     disconnectFromServer();
 }
 
-BLEScanResults BLEClientWrapper::startScan()
-{
-    return bleScan_->start(1, false); // Сканирование на 5 секунд
-}
-
 bool BLEClientWrapper::connectToServer()
 {
+    Serial.println("Connecting to server...");
     disconnectFromServer();              // Отключаемся от предыдущего сервера, если это необходимо
+    free(client_);
     client_ = BLEDevice::createClient(); // Создаем новый клиент BLE
+    while (!foundDevice_)
+    {
+        /* code */
+    }
+    Serial.println("Connected");
 
     if (!client_->connect(foundDevice_)) // Попытка подключения к устройству
     {
         Serial.println("Failed to connect to server.");
         return false;
     }
+
+    Serial.println("Subsribing to services...");
 
     // Перебираем все описания сервисов и подключаемся к характеристикам
     for (const auto &serviceDesc : serviceDescriptors_)
@@ -134,6 +141,7 @@ bool BLEClientWrapper::connectToServer()
             BLEUUID tempUuid = serviceDesc.serviceUUID;
             Serial.println("Service not found: " + String(tempUuid.toString().c_str()));
         }
+        Serial.println("Reconnetion compleete");
     }
 
     lastDeviceAddress_ = foundDevice_->getAddress().toString(); // Сохраняем адрес устройства для возможного переподключения
@@ -152,19 +160,20 @@ void BLEClientWrapper::disconnectFromServer()
 
 void BLEClientWrapper::tryReconnect()
 {
-    if (!lastDeviceAddress_.empty() && client_)
-    {
-        BLEAddress addr(lastDeviceAddress_);
-        if (client_->connect(addr))
-        {
-            Serial.println("Reconnected to BLE device.");
-            // Тут ваш код для повторной установки сервисов и характеристик
-        }
-        else
-        {
-            Serial.println("Failed to reconnect to BLE device.");
-        }
-    }
+    connectToServer();
+    // if (!lastDeviceAddress_.empty() && client_)
+    // {
+    //     BLEAddress addr(lastDeviceAddress_);
+    //     if (client_->connect(addr))
+    //     {
+    //         Serial.println("Reconnected to BLE device.");
+    //         // Тут ваш код для повторной установки сервисов и характеристик
+    //     }
+    //     else
+    //     {
+    //         Serial.println("Failed to reconnect to BLE device.");
+    //     }
+    // }
 }
 
 bool BLEClientWrapper::isConnected() const
@@ -180,6 +189,6 @@ void BLEClientWrapper::taskManager()
         {
             tryReconnect();
         }
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Задержка на 1 секунду
+        vTaskDelay(10 / portTICK_PERIOD_MS); // Задержка на 1 секунду
     }
 }
