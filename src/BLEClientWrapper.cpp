@@ -63,6 +63,7 @@ BLEClientWrapper::BLEClientWrapper(const std::vector<BLEServiceDescriptor> &desc
 BLEScanResults BLEClientWrapper::startScan()
 {
     BLEScanResults results;
+    if (pDevice_) pDevice_ = nullptr;
     do
     {
         results = bleScan_->start(1, false); // Сканирование
